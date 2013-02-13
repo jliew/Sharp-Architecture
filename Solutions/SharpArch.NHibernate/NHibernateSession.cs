@@ -1,23 +1,18 @@
-﻿namespace SharpArch.NHibernate
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
+using FluentNHibernate.Automapping;
+using FluentNHibernate.Cfg;
+using FluentNHibernate.Cfg.Db;
+using NHibernate;
+using NHibernate.Cfg;
+using SharpArch.Domain;
+using NHibernate.Event;
+using SharpArch.NHibernate.NHibernateValidator;
+
+namespace SharpArch.NHibernate
 {
-    using System;
-    using System.Collections.Generic;
-    using System.IO;
-    using System.Reflection;
-
-    using Domain;
-
-    using global::FluentNHibernate.Automapping;
-    using global::FluentNHibernate.Cfg;
-    using global::FluentNHibernate.Cfg.Db;
-
-    using global::NHibernate;
-    using global::NHibernate.Cfg;
-    using global::NHibernate.Event;
-    // using global::NHibernate.Validator.Engine;
-
-    using SharpArch.NHibernate.NHibernateValidator;
-
     public static class NHibernateSession
     {
         /// <summary>
@@ -72,7 +67,7 @@
             get
             {
                 Check.Require(
-                    !IsConfiguredForMultipleDatabases(), 
+                    !IsConfiguredForMultipleDatabases(),
                     "The NHibernateSession.Current property may " +
                     "only be invoked if you only have one NHibernate session factory; i.e., you're " +
                     "only communicating with one database.  Since you're configured communications " +
@@ -90,13 +85,14 @@
 
         [CLSCompliant(false)]
         public static Configuration AddConfiguration(
-            string factoryKey, 
-            string[] mappingAssemblies, 
-            AutoPersistenceModel autoPersistenceModel, 
-            string cfgFile, 
-            IDictionary<string, string> cfgProperties, 
-            string validatorCfgFile, 
-            IPersistenceConfigurer persistenceConfigurer)
+            string factoryKey,
+            string[] mappingAssemblies,
+            AutoPersistenceModel autoPersistenceModel,
+            string cfgFile,
+            IDictionary<string, string> cfgProperties,
+            string validatorCfgFile,
+            IPersistenceConfigurer persistenceConfigurer,
+            Action<Configuration> customConfiguration)
         {
             Configuration config;
             var configCache = ConfigurationCache;
@@ -110,12 +106,13 @@
             }
 
             config = AddConfiguration(
-                factoryKey, 
-                mappingAssemblies, 
-                autoPersistenceModel, 
-                ConfigureNHibernate(cfgFile, cfgProperties), 
-                validatorCfgFile, 
-                persistenceConfigurer);
+                factoryKey,
+                mappingAssemblies,
+                autoPersistenceModel,
+                ConfigureNHibernate(cfgFile, cfgProperties),
+                validatorCfgFile,
+                persistenceConfigurer,
+                customConfiguration);
 
             if (configCache != null)
             {
@@ -127,15 +124,16 @@
 
         [CLSCompliant(false)]
         public static Configuration AddConfiguration(
-            string factoryKey, 
-            string[] mappingAssemblies, 
-            AutoPersistenceModel autoPersistenceModel, 
-            Configuration cfg, 
-            string validatorCfgFile, 
-            IPersistenceConfigurer persistenceConfigurer)
+            string factoryKey,
+            string[] mappingAssemblies,
+            AutoPersistenceModel autoPersistenceModel,
+            Configuration cfg,
+            string validatorCfgFile,
+            IPersistenceConfigurer persistenceConfigurer,
+            Action<Configuration> customConfiguration)
         {
             var sessionFactory = CreateSessionFactoryFor(
-                mappingAssemblies, autoPersistenceModel, cfg, persistenceConfigurer);
+                mappingAssemblies, autoPersistenceModel, cfg, persistenceConfigurer, customConfiguration);
 
             return AddConfiguration(factoryKey, sessionFactory, cfg, validatorCfgFile);
         }
@@ -145,7 +143,7 @@
             string factoryKey, ISessionFactory sessionFactory, Configuration cfg, string validatorCfgFile)
         {
             Check.Require(
-                !SessionFactories.ContainsKey(factoryKey), 
+                !SessionFactories.ContainsKey(factoryKey),
                 "A session factory has already been configured with the key of " + factoryKey);
 
             SessionFactories.Add(factoryKey, sessionFactory);
@@ -183,7 +181,7 @@
             Check.Require(!string.IsNullOrEmpty(factoryKey), "factoryKey may not be null or empty");
             Check.Require(Storage != null, "An ISessionStorage has not been configured");
             Check.Require(
-                SessionFactories.ContainsKey(factoryKey), 
+                SessionFactories.ContainsKey(factoryKey),
                 "An ISessionFactory does not exist with a factory key of " + factoryKey);
 
             var session = Storage.GetSessionForKey(factoryKey);
@@ -228,98 +226,101 @@
 
         public static Configuration Init(ISessionStorage storage, string[] mappingAssemblies)
         {
-            return Init(storage, mappingAssemblies, null, null, null, null, null);
+            return Init(storage, mappingAssemblies, null, null, null, null, null, null);
         }
 
         public static Configuration Init(ISessionStorage storage, string[] mappingAssemblies, string cfgFile)
         {
-            return Init(storage, mappingAssemblies, null, cfgFile, null, null, null);
+            return Init(storage, mappingAssemblies, null, cfgFile, null, null, null, null);
         }
 
         public static Configuration Init(
             ISessionStorage storage, string[] mappingAssemblies, IDictionary<string, string> cfgProperties)
         {
-            return Init(storage, mappingAssemblies, null, null, cfgProperties, null, null);
+            return Init(storage, mappingAssemblies, null, null, cfgProperties, null, null, null);
         }
 
         public static Configuration Init(
             ISessionStorage storage, string[] mappingAssemblies, string cfgFile, string validatorCfgFile)
         {
-            return Init(storage, mappingAssemblies, null, cfgFile, null, validatorCfgFile, null);
+            return Init(storage, mappingAssemblies, null, cfgFile, null, validatorCfgFile, null, null);
         }
 
         [CLSCompliant(false)]
         public static Configuration Init(
             ISessionStorage storage, string[] mappingAssemblies, AutoPersistenceModel autoPersistenceModel)
         {
-            return Init(storage, mappingAssemblies, autoPersistenceModel, null, null, null, null);
+            return Init(storage, mappingAssemblies, autoPersistenceModel, null, null, null, null, null);
         }
 
         [CLSCompliant(false)]
         public static Configuration Init(
-            ISessionStorage storage, 
-            string[] mappingAssemblies, 
-            AutoPersistenceModel autoPersistenceModel, 
-            string cfgFile)
+            ISessionStorage storage,
+            string[] mappingAssemblies,
+            AutoPersistenceModel autoPersistenceModel,
+            string cfgFile,
+            Action<Configuration> customConfiguration)
         {
-            return Init(storage, mappingAssemblies, autoPersistenceModel, cfgFile, null, null, null);
+            return Init(storage, mappingAssemblies, autoPersistenceModel, cfgFile, null, null, null, customConfiguration);
         }
 
         [CLSCompliant(false)]
         public static Configuration Init(
-            ISessionStorage storage, 
-            string[] mappingAssemblies, 
-            AutoPersistenceModel autoPersistenceModel, 
+            ISessionStorage storage,
+            string[] mappingAssemblies,
+            AutoPersistenceModel autoPersistenceModel,
             IDictionary<string, string> cfgProperties)
         {
-            return Init(storage, mappingAssemblies, autoPersistenceModel, null, cfgProperties, null, null);
+            return Init(storage, mappingAssemblies, autoPersistenceModel, null, cfgProperties, null, null, null);
         }
 
         [CLSCompliant(false)]
         public static Configuration Init(
-            ISessionStorage storage, 
-            string[] mappingAssemblies, 
-            AutoPersistenceModel autoPersistenceModel, 
-            string cfgFile, 
+            ISessionStorage storage,
+            string[] mappingAssemblies,
+            AutoPersistenceModel autoPersistenceModel,
+            string cfgFile,
             string validatorCfgFile)
         {
-            return Init(storage, mappingAssemblies, autoPersistenceModel, cfgFile, null, validatorCfgFile, null);
+            return Init(storage, mappingAssemblies, autoPersistenceModel, cfgFile, null, validatorCfgFile, null, null);
         }
 
         [CLSCompliant(false)]
         public static Configuration Init(
-            ISessionStorage storage, 
-            string[] mappingAssemblies, 
-            AutoPersistenceModel autoPersistenceModel, 
-            string cfgFile, 
-            IDictionary<string, string> cfgProperties, 
+            ISessionStorage storage,
+            string[] mappingAssemblies,
+            AutoPersistenceModel autoPersistenceModel,
+            string cfgFile,
+            IDictionary<string, string> cfgProperties,
             string validatorCfgFile)
         {
             return Init(
-                storage, mappingAssemblies, autoPersistenceModel, cfgFile, cfgProperties, validatorCfgFile, null);
+                storage, mappingAssemblies, autoPersistenceModel, cfgFile, cfgProperties, validatorCfgFile, null, null);
         }
 
         [CLSCompliant(false)]
         public static Configuration Init(
-            ISessionStorage storage, 
-            string[] mappingAssemblies, 
-            AutoPersistenceModel autoPersistenceModel, 
-            string cfgFile, 
-            IDictionary<string, string> cfgProperties, 
-            string validatorCfgFile, 
-            IPersistenceConfigurer persistenceConfigurer)
+            ISessionStorage storage,
+            string[] mappingAssemblies,
+            AutoPersistenceModel autoPersistenceModel,
+            string cfgFile,
+            IDictionary<string, string> cfgProperties,
+            string validatorCfgFile,
+            IPersistenceConfigurer persistenceConfigurer,
+            Action<Configuration> customConfiguration)
         {
             InitStorage(storage);
             try
             {
                 return AddConfiguration(
-                    DefaultFactoryKey, 
-                    mappingAssemblies, 
-                    autoPersistenceModel, 
-                    cfgFile, 
-                    cfgProperties, 
-                    validatorCfgFile, 
-                    persistenceConfigurer);
+                    DefaultFactoryKey,
+                    mappingAssemblies,
+                    autoPersistenceModel,
+                    cfgFile,
+                    cfgProperties,
+                    validatorCfgFile,
+                    persistenceConfigurer,
+                    customConfiguration);
             }
             catch
             {
@@ -401,10 +402,11 @@
         }
 
         private static ISessionFactory CreateSessionFactoryFor(
-            IEnumerable<string> mappingAssemblies, 
-            AutoPersistenceModel autoPersistenceModel, 
-            Configuration cfg, 
-            IPersistenceConfigurer persistenceConfigurer)
+            IEnumerable<string> mappingAssemblies,
+            AutoPersistenceModel autoPersistenceModel,
+            Configuration cfg,
+            IPersistenceConfigurer persistenceConfigurer,
+            Action<Configuration> customConfiguration)
         {
             var fluentConfiguration = Fluently.Configure(cfg);
 
@@ -415,33 +417,36 @@
 
             fluentConfiguration.Mappings(
                 m =>
+                {
+                    foreach (var mappingAssembly in mappingAssemblies)
                     {
-                        foreach (var mappingAssembly in mappingAssemblies)
-                        {
-                            var assembly = Assembly.LoadFrom(MakeLoadReadyAssemblyName(mappingAssembly));
+                        var assembly = Assembly.LoadFrom(MakeLoadReadyAssemblyName(mappingAssembly));
 
-                            m.HbmMappings.AddFromAssembly(assembly);
-                            m.FluentMappings.AddFromAssembly(assembly).Conventions.AddAssembly(assembly);
-                        }
+                        m.HbmMappings.AddFromAssembly(assembly);
+                        m.FluentMappings.AddFromAssembly(assembly).Conventions.AddAssembly(assembly);
+                    }
 
-                        if (autoPersistenceModel != null)
-                        {
-                            m.AutoMappings.Add(autoPersistenceModel);
-                        }
-                    });
+                    if (autoPersistenceModel != null)
+                    {
+                        m.AutoMappings.Add(autoPersistenceModel);
+                    }
+                });
 
-            fluentConfiguration.ExposeConfiguration(
+            Action<Configuration> exposeConfiguration = (
                 e =>
-                    {
-                        e.EventListeners.PreInsertEventListeners = new IPreInsertEventListener[]
+                {
+                    e.EventListeners.PreInsertEventListeners = new IPreInsertEventListener[]
                             {
                                 new DataAnnotationsEventListener()
                             };
-                        e.EventListeners.PreUpdateEventListeners = new IPreUpdateEventListener[]
+                    e.EventListeners.PreUpdateEventListeners = new IPreUpdateEventListener[]
                             {
                                 new DataAnnotationsEventListener()
                             };
-                    });
+                }
+            );
+
+            fluentConfiguration.ExposeConfiguration(exposeConfiguration + customConfiguration);
 
             return fluentConfiguration.BuildSessionFactory();
         }
