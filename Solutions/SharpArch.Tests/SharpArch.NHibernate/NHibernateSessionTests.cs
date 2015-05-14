@@ -41,7 +41,7 @@ namespace SharpArch.Features.Tests.SharpArch.Features.NHibernate
             NHibernateSession.ConfigurationCache = new NHibernateConfigurationFileCache(new[] { "SharpArch.NHibernate" });
             var configuration1 = NHibernateSession.Init(new SimpleSessionStorage(), mappingAssemblies, configFile);
             var configuration2 = NHibernateSession.AddConfiguration(
-                "secondDatabase", new string[] { }, null, configFile, null, null, null);
+                "secondDatabase", new string[] { }, null, configFile, null, null, null, null);
 
             Assert.That(configuration1, Is.Not.Null);
             Assert.That(configuration2, Is.Not.Null);
@@ -56,7 +56,7 @@ namespace SharpArch.Features.Tests.SharpArch.Features.NHibernate
             var mappingAssemblies = new string[] { };
 
             var configuration = NHibernateSession.Init(
-                new SimpleSessionStorage(), mappingAssemblies, null, configFile, null, null, persistenceConfigurer);
+                new SimpleSessionStorage(), mappingAssemblies, null, configFile, null, null, persistenceConfigurer, null);
 
             Assert.That(configuration, Is.Not.Null);
         }
@@ -69,7 +69,7 @@ namespace SharpArch.Features.Tests.SharpArch.Features.NHibernate
             var mappingAssemblies = new string[] { };
 
             var configuration = NHibernateSession.Init(
-                new SimpleSessionStorage(), mappingAssemblies, null, null, null, null, persistenceConfigurer);
+                new SimpleSessionStorage(), mappingAssemblies, null, null, null, null, persistenceConfigurer, null);
 
             Assert.That(configuration, Is.Not.Null);
         }

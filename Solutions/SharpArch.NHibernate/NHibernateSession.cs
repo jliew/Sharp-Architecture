@@ -95,7 +95,8 @@
             string cfgFile, 
             IDictionary<string, string> cfgProperties, 
             string validatorCfgFile, 
-            IPersistenceConfigurer persistenceConfigurer)
+            IPersistenceConfigurer persistenceConfigurer,
+            Action<Configuration> customConfiguration)
         {
             Configuration config;
             var configCache = ConfigurationCache;
@@ -114,7 +115,8 @@
                 autoPersistenceModel, 
                 ConfigureNHibernate(cfgFile, cfgProperties), 
                 validatorCfgFile, 
-                persistenceConfigurer);
+                persistenceConfigurer,
+                customConfiguration);
 
             if (configCache != null)
             {
@@ -130,10 +132,11 @@
             AutoPersistenceModel autoPersistenceModel, 
             Configuration cfg, 
             string validatorCfgFile, 
-            IPersistenceConfigurer persistenceConfigurer)
+            IPersistenceConfigurer persistenceConfigurer,
+            Action<Configuration> customConfiguration)
         {
             var sessionFactory = CreateSessionFactoryFor(
-                mappingAssemblies, autoPersistenceModel, cfg, persistenceConfigurer);
+                mappingAssemblies, autoPersistenceModel, cfg, persistenceConfigurer, customConfiguration);
 
             return AddConfiguration(factoryKey, sessionFactory, cfg, validatorCfgFile);
         }
@@ -225,39 +228,40 @@
 
         public static Configuration Init(ISessionStorage storage, string[] mappingAssemblies)
         {
-            return Init(storage, mappingAssemblies, null, null, null, null, null);
+            return Init(storage, mappingAssemblies, null, null, null, null, null, null);
         }
 
         public static Configuration Init(ISessionStorage storage, string[] mappingAssemblies, string cfgFile)
         {
-            return Init(storage, mappingAssemblies, null, cfgFile, null, null, null);
+            return Init(storage, mappingAssemblies, null, cfgFile, null, null, null, null);
         }
 
         public static Configuration Init(
             ISessionStorage storage, string[] mappingAssemblies, IDictionary<string, string> cfgProperties)
         {
-            return Init(storage, mappingAssemblies, null, null, cfgProperties, null, null);
+            return Init(storage, mappingAssemblies, null, null, cfgProperties, null, null, null);
         }
 
         public static Configuration Init(
             ISessionStorage storage, string[] mappingAssemblies, string cfgFile, string validatorCfgFile)
         {
-            return Init(storage, mappingAssemblies, null, cfgFile, null, validatorCfgFile, null);
+            return Init(storage, mappingAssemblies, null, cfgFile, null, validatorCfgFile, null, null);
         }
 
         public static Configuration Init(
             ISessionStorage storage, string[] mappingAssemblies, AutoPersistenceModel autoPersistenceModel)
         {
-            return Init(storage, mappingAssemblies, autoPersistenceModel, null, null, null, null);
+            return Init(storage, mappingAssemblies, autoPersistenceModel, null, null, null, null, null);
         }
 
         public static Configuration Init(
             ISessionStorage storage, 
             string[] mappingAssemblies, 
             AutoPersistenceModel autoPersistenceModel, 
-            string cfgFile)
+            string cfgFile,
+            Action<Configuration> customConfiguration)
         {
-            return Init(storage, mappingAssemblies, autoPersistenceModel, cfgFile, null, null, null);
+            return Init(storage, mappingAssemblies, autoPersistenceModel, cfgFile, null, null, null, customConfiguration);
         }
 
         public static Configuration Init(
@@ -266,7 +270,7 @@
             AutoPersistenceModel autoPersistenceModel, 
             IDictionary<string, string> cfgProperties)
         {
-            return Init(storage, mappingAssemblies, autoPersistenceModel, null, cfgProperties, null, null);
+            return Init(storage, mappingAssemblies, autoPersistenceModel, null, cfgProperties, null, null, null);
         }
 
         public static Configuration Init(
@@ -276,7 +280,7 @@
             string cfgFile, 
             string validatorCfgFile)
         {
-            return Init(storage, mappingAssemblies, autoPersistenceModel, cfgFile, null, validatorCfgFile, null);
+            return Init(storage, mappingAssemblies, autoPersistenceModel, cfgFile, null, validatorCfgFile, null, null);
         }
 
         public static Configuration Init(
@@ -288,7 +292,7 @@
             string validatorCfgFile)
         {
             return Init(
-                storage, mappingAssemblies, autoPersistenceModel, cfgFile, cfgProperties, validatorCfgFile, null);
+                storage, mappingAssemblies, autoPersistenceModel, cfgFile, cfgProperties, validatorCfgFile, null, null);
         }
 
         public static Configuration Init(
@@ -298,7 +302,8 @@
             string cfgFile, 
             IDictionary<string, string> cfgProperties, 
             string validatorCfgFile, 
-            IPersistenceConfigurer persistenceConfigurer)
+            IPersistenceConfigurer persistenceConfigurer,
+            Action<Configuration> customConfiguration)
         {
             InitStorage(storage);
             try
@@ -310,7 +315,8 @@
                     cfgFile, 
                     cfgProperties, 
                     validatorCfgFile, 
-                    persistenceConfigurer);
+                    persistenceConfigurer,
+                    customConfiguration);
             }
             catch
             {
@@ -395,7 +401,8 @@
             IEnumerable<string> mappingAssemblies, 
             AutoPersistenceModel autoPersistenceModel, 
             Configuration cfg, 
-            IPersistenceConfigurer persistenceConfigurer)
+            IPersistenceConfigurer persistenceConfigurer,
+            Action<Configuration> customConfiguration)
         {
             var fluentConfiguration = Fluently.Configure(cfg);
 
@@ -421,7 +428,7 @@
                         }
                     });
 
-            fluentConfiguration.ExposeConfiguration(
+            Action<Configuration> exposeConfiguration = (
                 e =>
                     {
                         e.EventListeners.PreInsertEventListeners = new IPreInsertEventListener[]
@@ -433,6 +440,8 @@
                                 new DataAnnotationsEventListener()
                             };
                     });
+
+            fluentConfiguration.ExposeConfiguration(exposeConfiguration + customConfiguration);
 
             return fluentConfiguration.BuildSessionFactory();
         }
